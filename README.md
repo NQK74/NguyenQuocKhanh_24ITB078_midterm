@@ -1,179 +1,145 @@
-# myls — Simplified `ls(1)` Clone
+# HƯỚNG DẪN SỬ DỤNG CHƯƠNG TRÌNH `myls`
 
-A simplified clone of the UNIX `ls` command, written from scratch in C
-(C99 + POSIX APIs) as a university midterm project. Behaviour follows the
-provided NetBSD `ls` manual page (options `-AacdFfhiklnqRrSstuw`).
+Chương trình **`myls`** là phiên bản clone của lệnh `ls(1)` trên hệ điều hành **NetBSD**, được viết bằng ngôn ngữ C (chuẩn C99 và POSIX APIs) phục vụ môn học **Lập trình hệ thống (LTHT)**.
 
-## Implemented Options
+---
 
-| Flag | Description |
-|------|-------------|
-| `-A` | Show all entries except `.` and `..` (always on for the super-user) |
-| `-a` | Show all entries, including `.` and `..` |
-| `-c` | Use last status-change time (ctime) for sorting/display |
-| `-d` | List directories as plain files, do not descend |
-| `-F` | Append type indicator (`/` dir, `*` exec, `@` link, `=` socket, `\|` FIFO), directly after the name (`link@ -> target` in long format) |
-| `-f` | Do not sort output (implies `-a`) |
-| `-h` | Human-readable sizes (`1.5K`, `23M`) — overrides `-k` |
-| `-i` | Print inode number before each entry |
-| `-k` | Show block counts in 1024-byte units — overrides `-h` |
-| `-l` | Long listing format |
-| `-n` | Like `-l` but show numeric UID/GID |
-| `-q` | Replace non-printable characters with `?` (default on terminals); valid UTF-8 letters are kept |
-| `-R` | Recurse into subdirectories |
-| `-r` | Reverse sort order |
-| `-S` | Sort by file size, largest first |
-| `-s` | Print block count per entry (unit: 512, or `-k`, or `$BLOCKSIZE`) |
-| `-t` | Sort by modification time, newest first |
-| `-u` | Use last access time (atime) for sorting/display |
-| `-w` | Print raw non-printable characters (default when piped) |
+## 1. Yêu cầu môi trường
 
-Combined flags (e.g. `-laR`) and repeated flags work correctly.
-Mutually exclusive flags resolve by the "last one wins" rule.
+- **Hệ điều hành:** NetBSD, FreeBSD hoặc Linux (do chương trình sử dụng các system call POSIX như `lstat`, `opendir`, `readdir`, `readlink`, `pwd.h`, `grp.h` không có sẵn trên Windows).
+- **Trình biên dịch:** `cc` / `gcc` hoặc `clang`.
+- **Công cụ build:** `make` (hỗ trợ cả BSD make và GNU make).
 
-### Environment variables
+---
 
-- `BLOCKSIZE` — unit for `-s` and the `total` line when neither `-h` nor
-  `-k` is given. A number, optionally with suffix `k`/`m`/`g` (e.g. `1024`,
-  `1K`, `4096`). Default is 512. Invalid values fall back to 512.
-- `TZ` — time zone used for the time column in long format.
-- `LANG` / `LC_ALL` — locale used to decide which characters are printable
-  for `-q` (so UTF-8 file names such as `Tài liệu.txt` are shown correctly).
+## 2. Cách đưa mã nguồn lên máy ảo & Đăng nhập
 
-### Design choices where the man page is silent
+Từ máy chủ Windows, mở PowerShell/CMD và sử dụng lệnh `scp` và `ssh`:
 
-- `-f` also implies `-a` (as in NetBSD `ls`).
-- A symbolic link given as an operand is followed (and listed as a
-  directory) unless `-d` is given.
-- Entries are sorted by name with `strcmp` (byte order); with `-t`, ties
-  are broken by name.
+### Bước 2.1: Chuyển mã nguồn lên máy ảo (chạy trên Windows)
+```powershell
+# Chuyển thư mục code qua cổng SSH 2222
+scp -P 2222 -r d:\workspace\LTHT nqk@127.0.0.1:~/
 
-## File Structure
-
-```
-myls/
-├── main.c         Entry point: parse options → list operands → exit
-├── options.c/.h   Command-line flag parsing (getopt) and Options struct
-├── entry.c/.h     Entry struct (one file/dir) — lstat, readlink, free
-├── sort.c/.h      qsort comparators (name, size, time) with sort dispatch
-├── print.c/.h     Output formatting: short, long, total, mode, sizes, time
-├── list.c/.h      Directory listing, operand handling, -R recursion
-├── Makefile        Build system (gcc, -Wall -Wextra -std=c99)
-├── .gitignore      Ignore binary, *.o, editor junk
-├── README.md       This file
-└── tests/
-    └── run_tests.sh   Automated diff-based tests against system ls
+# Hoặc chuyển file zip
+scp -P 2222 D:\LTHT_netbsd.zip nqk@127.0.0.1:~/
 ```
 
-## Building
+### Bước 2.2: Đăng nhập SSH vào máy ảo
+```powershell
+ssh nqk@127.0.0.1 -p 2222
+```
 
-Requires GCC and GNU Make on a Linux/POSIX system.
+---
+
+## 3. Biên dịch chương trình
+
+Khi đã ở trong terminal của máy ảo NetBSD:
 
 ```bash
-make            # build the binary (./myls)
-make clean      # remove binary and object files
+# 1. Đi vào thư mục chứa mã nguồn
+cd ~/LTHT
+
+# 2. Xóa các file build cũ (nếu có)
+make clean
+
+# 3. Biên dịch chương trình
+make
 ```
 
-Compile flags: `-Wall -Wextra -std=c99 -D_DEFAULT_SOURCE`
+Sau khi hoàn tất, file thực thi nhị phân `./myls` sẽ được tạo ra trong cùng thư mục.
 
-For debug/sanitizer builds:
+---
+
+## 4. Cú pháp sử dụng
 
 ```bash
-make CFLAGS="-Wall -Wextra -std=c99 -D_DEFAULT_SOURCE -g -fsanitize=address,undefined"
+./myls [-AacdFfhiklnqRrSstuw] [file ...]
 ```
 
-## Running
+- Nếu **không truyền tham số**: Chương trình liệt kê nội dung của thư mục hiện tại (`.`).
+- Nếu **truyền nhiều tham số hỗn hợp**: File thường sẽ được in trước, thư mục in sau và có tiêu đề riêng biệt.
+
+---
+
+## 5. Bảng tra cứu các tùy chọn (Flags)
+
+| Cờ | Tên gọi | Chức năng | Ví dụ |
+| :---: | :--- | :--- | :--- |
+| **`-a`** | All | Liệt kê tất cả file, bao gồm file ẩn bắt đầu bằng dấu chấm (`.` và `..`) | `./myls -a` |
+| **`-A`** | Almost All | Liệt kê file ẩn nhưng loại trừ `.` và `..` *(mặc định bật cho super-user/root)* | `./myls -A` |
+| **`-l`** | Long Format | Hiển thị dạng danh sách chi tiết (mode, link, owner, group, size, date, name) | `./myls -l` |
+| **`-n`** | Numeric | Tương tự `-l` nhưng hiển thị UID và GID dạng số | `./myls -n` |
+| **`-h`** | Human-readable | Hiển thị dung lượng dạng dễ đọc (`K`, `M`, `G`), ghi đè `-k` | `./myls -lh` |
+| **`-k`** | Kilobytes | Hiển thị kích thước/block theo đơn vị KB (1024 bytes), ghi đè `-h` | `./myls -lk` |
+| **`-i`** | Inode | Hiển thị số hiệu inode trước mỗi file | `./myls -i` |
+| **`-s`** | Size (Blocks) | Hiển thị số block thực tế cấp phát trên ổ cứng | `./myls -s` |
+| **`-F`** | Type Indicator | Thêm ký hiệu sau tên file: `/` (thư mục), `*` (thực thi), `@` (symlink), `\|` (FIFO), `=` (socket), `%` (whiteout) | `./myls -F` |
+| **`-d`** | Directory only | Xem thư mục như file thường, không mở liệt kê nội dung bên trong | `./myls -ld tests` |
+| **`-R`** | Recursive | Duyệt đệ quy tất cả các thư mục con | `./myls -R` |
+| **`-r`** | Reverse | Đảo ngược thứ tự sắp xếp | `./myls -lr` |
+| **`-S`** | Sort by Size | Sắp xếp các file theo kích thước giảm dần | `./myls -lS` |
+| **`-t`** | Sort by Time | Sắp xếp theo thời gian sửa đổi (mới nhất lên đầu) | `./myls -lt` |
+| **`-u`** | Access Time | Sử dụng thời gian truy cập gần nhất (atime) để hiển thị/sắp xếp | `./myls -lu` |
+| **`-c`** | Status Change Time | Sử dụng thời gian thay đổi trạng thái inode (ctime) để hiển thị/sắp xếp | `./myls -lc` |
+| **`-f`** | Unsorted | Không sắp xếp kết quả (tự động bật cờ `-a`) | `./myls -f` |
+| **`-q`** | Question Mark | Chuyển các ký tự không in được thành dấu `?` (hỗ trợ UTF-8) | `./myls -q` |
+| **`-w`** | Raw Print | In nguyên bản ký tự thô (không thay thế ký tự lạ) | `./myls -w` |
+
+---
+
+## 6. Quy tắc ưu tiên & Biến môi trường
+
+### 6.1. Quy tắc ghi đè (Cờ xuất hiện sau cùng sẽ thắng)
+- **`-w`** và **`-q`**: Cờ nào đứng sau sẽ quyết định cách in ký tự.
+- **`-l`** và **`-n`**: Cờ nào đứng sau sẽ quyết định hiển thị tên hay ID số.
+- **`-h`** và **`-k`**: Cờ nào đứng sau sẽ quyết định đơn vị dung lượng.
+- **`-c`** và **`-u`**: Cờ nào đứng sau sẽ quyết định mốc thời gian lấy theo ctime hay atime.
+- **`-R`** và **`-d`**: Cờ nào đứng sau sẽ quyết định duyệt đệ quy hay chỉ xem thư mục như file.
+
+### 6.2. Biến môi trường
+- **`BLOCKSIZE`**: Xác định đơn vị khối tính cho `-s` và dòng `total`. Hỗ trợ các hậu tố `k`, `m`, `g` (Ví dụ: `BLOCKSIZE=1K ./myls -s` hoặc `BLOCKSIZE=4096 ./myls -s`).
+- **`TZ`**: Điều khiển múi giờ khi hiển thị cột ngày giờ ở dạng chi tiết `-l`.
+
+---
+
+## 7. Các ví dụ minh họa thường dùng
 
 ```bash
-./myls                      # list current directory
-./myls -l /etc              # long format
-./myls -la                  # all files, long format
-./myls -lhS /usr/bin        # long, human-readable sizes, sorted by size
-./myls -R /etc 2>/dev/null  # recursive listing
-./myls -laR /tmp            # all files, long, recursive
-./myls -id /                # inode number, treat / as plain file
-./myls -F /dev              # type indicators
-./myls file1 dir1 file2     # mixed file and directory operands
+# Xem toàn bộ file bao gồm file ẩn với chi tiết quyền và dung lượng dễ đọc:
+./myls -lah
+
+# Xem file sắp xếp theo kích thước giảm dần:
+./myls -lSh
+
+# Xem file kèm số inode và ký hiệu phân loại file:
+./myls -iF
+
+# Liệt kê đệ quy một thư mục cụ thể:
+./myls -laR tests/
+
+# Kiểm tra symlink và xem thông tin thư mục như một file:
+./myls -ld tests
 ```
 
-### Example Output
+---
 
-```
-$ ./myls -la
-total 336
-drwxr-xr-x 3 user user  4096 Oct  2 01:16 .
-drwxr-xr-x 8 user user  4096 Oct  1 12:34 ..
--rw-r--r-- 1 user user    28 Oct  1 12:06 .gitignore
--rw-r--r-- 1 user user   443 Oct  1 12:06 Makefile
--rw-r--r-- 1 user user  4606 Oct  1 12:12 README.md
--rw-r--r-- 1 user user  2705 Oct  1 12:08 entry.c
--rw-r--r-- 1 user user  1538 Oct  1 12:07 entry.h
-...
+## 8. Chạy bộ kiểm thử tự động (Test Suite)
 
-$ ./myls -lhS *.c
--rw-r--r-- 1 user user  14K Oct  1 12:37 print.c
--rw-r--r-- 1 user user 8.9K Oct  1 12:13 list.c
--rw-r--r-- 1 user user 3.3K Oct  1 12:37 options.c
--rw-r--r-- 1 user user 2.6K Oct  1 12:08 entry.c
--rw-r--r-- 1 user user 2.4K Oct  1 12:08 sort.c
--rw-r--r-- 1 user user  809 Oct  1 12:37 main.c
-
-$ BLOCKSIZE=1K ./myls -s main.c print.c
- 4 main.c
-16 print.c
-
-$ ./myls -lF /tmp/lnk_demo
-lrwxrwxrwx 1 user user 6 Oct  2 01:16 /tmp/lnk_demo@ -> main.c
-```
-
-*(Sizes and dates will differ on your machine.)*
-
-## Testing
+Dự án tích hợp sẵn kịch bản kiểm thử tự động gồm 41 test case so sánh với lệnh `ls` chuẩn của hệ điều hành:
 
 ```bash
+# Cấp quyền thực thi cho script test (chỉ cần chạy lần đầu)
 chmod +x tests/run_tests.sh
+
+# Chạy kiểm thử
 ./tests/run_tests.sh
 ```
 
-The script builds a temporary directory tree (regular files, directories,
-symlinks, a FIFO, hidden files, a file with spaces, files dated in the past
-and in the future) and compares `myls` against the system `ls` for 41 flag
-combinations, including `BLOCKSIZE` values. Notes:
+---
 
-- GNU `ls` is only a reference. The script sets `POSIXLY_CORRECT=1` so GNU
-  `ls` uses 512-byte blocks like the man page, and adds `-A` to the
-  reference when run as root.
-- Every test entry gets a distinct timestamp, because GNU `ls` breaks
-  same-second ties by nanoseconds while `myls` breaks them by name.
-- One intentional difference is normalised in the `-laFi` test: with `-lF`
-  the man page puts `@` right after a symlink's name (`la@ -> a`), while
-  GNU `ls` prints `la -> a/`.
+## 9. Mã thoát (Exit Codes)
 
-All 41 tests pass both as root and as a normal user. The code was also run
-under `-fsanitize=address,undefined` on edge cases (missing operands,
-unreadable directories, symlink loops, very long names and paths, invalid
-options, non-UTF-8 file names) without errors.
-
-## Known Limitations
-
-- **Linux and NetBSD**: uses POSIX APIs (`lstat`, `readlink`, `opendir`,
-  etc.); `<sys/sysmacros.h>` is included only on Linux. The Makefile works
-  with both BSD make and GNU make. On Windows use WSL or a VM. Not tested
-  on macOS.
-- **Whiteout files**: the `S_IFWHT` type exists only on BSDs. The code
-  compiles the whiteout check conditionally (`#ifdef S_IFWHT`).
-- **Unreadable subdirectories with `-R`**: the error message is printed,
-  but the `dir:` header line is not shown before it (real `ls` prints it).
-- **`total` line with `-s`**: printed whenever `-s` is used, not only when
-  output is a terminal.
-- **Column output**: only one-entry-per-line mode is implemented (no
-  multi-column output when stdout is a terminal).
-- **No color support**: output is plain text only.
-
-## GitHub Repository
-
-`<URL_PLACEHOLDER>` *(replace with your repo URL)*
-
-## License
-
-University coursework — not for redistribution.
+- **`0`**: Thực thi thành công không có lỗi.
+- **`1`**: Lỗi khi đọc file/thư mục (ví dụ file không tồn tại, không đủ quyền đọc).
+- **`2`**: Lỗi cú pháp dòng lệnh (truyền tham số tùy chọn không hợp lệ).
